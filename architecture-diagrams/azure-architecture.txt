@@ -1,0 +1,169 @@
+AZURE CLOUD ARCHITECTURE — DETAILED DIAGRAM
+===========================================
+
+This diagram shows the full Azure infrastructure that hosts
+a production modern web application.
+
+                              ┌─────────────────┐
+                              │    INTERNET      │
+                              │  (Users globally)│
+                              └────────┬─────────┘
+                                       │
+                              HTTPS requests
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    AZURE FRONT DOOR (Global)                          │
+│                                                                       │
+│  • Anycast network: routes users to nearest Azure region             │
+│  • WAF (Web Application Firewall): blocks SQL injection, XSS, etc.  │
+│  • SSL/TLS termination: handles HTTPS certificates                   │
+│  • CDN: caches React static files (JS, CSS, images) at edge         │
+│  • Health probes: automatically stops sending traffic to unhealthy   │
+│    origins                                                            │
+│                                                                       │
+│  Routing rules:                                                       │
+│  /static/* ──────────────────────▶ Azure CDN (cached)               │
+│  /* ──────────────────────────────▶ AKS Cluster (West Europe)        │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+               Forwarded to nearest AKS region
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                AZURE KUBERNETES SERVICE (AKS) CLUSTER                │
+│                          Region: West Europe                          │
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │                        CONTROL PLANE                            │  │
+│  │  (Managed by Azure — you don't pay per VM for this)            │  │
+│  │  API Server · etcd (state) · Scheduler · Controller Manager   │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │                    INGRESS LAYER                              │     │
+│  │   Azure Application Gateway Ingress Controller (AGIC)        │     │
+│  │                                                               │     │
+│  │  /            ──▶ frontend-service (React static)            │     │
+│  │  /api/products ──▶ product-service                           │     │
+│  │  /api/orders   ──▶ order-service                             │     │
+│  │  /api/users    ──▶ user-service                              │     │
+│  │  /api/payments ──▶ payment-service                           │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                              │                                        │
+│         ┌────────────────────┼────────────────────┐                  │
+│         ▼                    ▼                     ▼                  │
+│  ┌─────────────┐   ┌──────────────────────────────────────────┐      │
+│  │  Node Pool  │   │              Node Pool                    │      │
+│  │  (Frontend) │   │          (Backend Services)               │      │
+│  │             │   │                                            │      │
+│  │ ┌─────────┐ │   │  ┌──────────┐ ┌──────────┐ ┌──────────┐  │      │
+│  │ │ Pod     │ │   │  │  Pod     │ │  Pod     │ │  Pod     │  │      │
+│  │ │ React   │ │   │  │ product- │ │ product- │ │ product- │  │      │
+│  │ │ (nginx) │ │   │  │ service  │ │ service  │ │ service  │  │      │
+│  │ │  :80    │ │   │  │  :8080   │ │  :8080   │ │  :8080   │  │      │
+│  │ └─────────┘ │   │  └──────────┘ └──────────┘ └──────────┘  │      │
+│  │ ┌─────────┐ │   │        ↑ Deployment: 3 replicas           │      │
+│  │ │ Pod     │ │   │                                            │      │
+│  │ │ React   │ │   │  ┌──────────┐ ┌──────────┐               │      │
+│  │ │ (nginx) │ │   │  │  Pod     │ │  Pod     │               │      │
+│  │ │  :80    │ │   │  │ order-   │ │ order-   │               │      │
+│  │ └─────────┘ │   │  │ service  │ │ service  │               │      │
+│  └─────────────┘   │  │  :8082   │ │  :8082   │               │      │
+│                    │  └──────────┘ └──────────┘               │      │
+│                    │        ↑ Deployment: 2 replicas           │      │
+│                    │                                            │      │
+│                    │  ┌──────────┐ ┌──────────┐               │      │
+│                    │  │  Pod     │ │  Pod     │               │      │
+│                    │  │ user-    │ │ payment- │               │      │
+│                    │  │ service  │ │ service  │               │      │
+│                    │  │  :8081   │ │  :8084   │               │      │
+│                    │  └──────────┘ └──────────┘               │      │
+│                    └──────────────────────────────────────────┘      │
+│                                       │                              │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                    CLUSTER SERVICES                            │   │
+│  │                                                                │   │
+│  │  product-svc (ClusterIP)  ←── Internal DNS: product-svc      │   │
+│  │  order-svc   (ClusterIP)  ←── Internal DNS: order-svc        │   │
+│  │  user-svc    (ClusterIP)  ←── Internal DNS: user-svc         │   │
+│  │  payment-svc (ClusterIP)  ←── Internal DNS: payment-svc      │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
+         │                    │                           │
+         ▼                    ▼                           ▼
+┌──────────────────┐  ┌──────────────────┐  ┌───────────────────────┐
+│ AZURE SQL DATABASE│  │ AZURE COSMOS DB  │  │  AZURE BLOB STORAGE   │
+│                  │  │                  │  │                       │
+│ Managed SQL      │  │ Globally         │  │ Object storage for    │
+│ Server database  │  │ distributed      │  │ unstructured data     │
+│                  │  │ NoSQL            │  │                       │
+│ Tables:          │  │                  │  │ Containers:           │
+│ • users          │  │ Containers:      │  │ • product-images/     │
+│ • orders         │  │ • products       │  │ • order-docs/         │
+│ • order_items    │  │ • user_sessions  │  │ • backups/            │
+│ • payments       │  │ • activity_log   │  │ • exports/            │
+│ • audit_logs     │  │ • recommendations│  │                       │
+│                  │  │                  │  │ CDN origin for        │
+│ Geo-redundant    │  │ Multi-region     │  │ static assets         │
+│ (auto-failover)  │  │ write support    │  │                       │
+└──────────────────┘  └──────────────────┘  └───────────────────────┘
+
+ADDITIONAL AZURE SERVICES (not shown above for clarity):
+=========================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    AZURE KEY VAULT                               │
+│  • JWT signing keys                                             │
+│  • Database connection strings                                  │
+│  • API keys for external services                               │
+│  • TLS certificates                                             │
+│  • Accessed by pods via Managed Identity (no passwords in code) │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│              AZURE MONITOR + LOG ANALYTICS                       │
+│  • Aggregates logs from all pods                                │
+│  • Metrics: CPU, memory, request latency, error rates           │
+│  • Alerts: notify team when error rate spikes                   │
+│  • Application Insights: distributed tracing across services    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│              AZURE CONTAINER REGISTRY (ACR)                      │
+│  • Private Docker image registry                                │
+│  • Stores versioned images: my-app:1.0, my-app:1.1, my-app:2.0 │
+│  • AKS pulls images from ACR using Managed Identity             │
+│  • Image scanning: detects vulnerabilities in images            │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│              AZURE ACTIVE DIRECTORY (AAD)                        │
+│  • Identity provider for the application                        │
+│  • Issues OAuth2/OIDC tokens (used as JWTs)                     │
+│  • Manages Managed Identities for pods (no secrets needed)      │
+│  • Controls RBAC for Azure resources                            │
+└─────────────────────────────────────────────────────────────────┘
+
+CI/CD PIPELINE (How code gets to production):
+=============================================
+
+Developer's laptop
+      │
+      │  git push
+      ▼
+GitHub / Azure DevOps Repository
+      │
+      │  Triggers CI pipeline
+      ▼
+Azure DevOps / GitHub Actions Pipeline
+      │
+      ├── Run unit tests (JUnit, Jest)
+      ├── Run integration tests
+      ├── Build Docker images
+      ├── Push images to Azure Container Registry
+      └── Deploy to AKS (kubectl apply / Helm upgrade)
+                  │
+                  ▼
+           AKS performs rolling update
+           (zero downtime deployment)
