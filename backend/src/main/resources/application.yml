@@ -6,3 +6,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+app:
+  jwt:
+    secret: "modern-web-app-jwt-secret-key-must-be-at-least-32-chars"
+    expiration-ms: 86400000
