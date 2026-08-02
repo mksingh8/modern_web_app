@@ -8,11 +8,11 @@ const renderAtRoute = (route) => {
 };
 
 describe('App routes', () => {
-  it('renders the login page placeholder', () => {
+  it('renders the login page with a form', () => {
     renderAtRoute('/login');
 
     expect(screen.getByRole('heading', { name: 'Login' })).toBeTruthy();
-    expect(screen.getByText('Login page placeholder')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Log In' })).toBeTruthy();
   });
 
   it('renders the dashboard page placeholder', () => {
