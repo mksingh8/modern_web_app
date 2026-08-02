@@ -4,6 +4,79 @@
 
 ---
 
+## Repository Structure
+
+```
+modern_web_app/
+├── frontend/   # React single-page application
+├── backend/    # Spring Boot REST API
+├── infra/      # Infrastructure-as-code (Kubernetes, Terraform, Docker)
+└── docs/       # Project documentation and architecture diagrams
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+| Tool | Version |
+|------|---------|
+| Node.js | 18 LTS or later |
+| npm | 9+ |
+| Java | 17+ |
+| Maven | 3.8+ (or use the included `mvnw` wrapper) |
+| Docker | 24+ (optional, for containerised runs) |
+
+### Setup
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/mksingh8/modern_web_app.git
+cd modern_web_app
+```
+
+**2. Install frontend dependencies**
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+**3. Install backend dependencies**
+
+```bash
+cd backend
+./mvnw install -DskipTests
+cd ..
+```
+
+### Run
+
+**Frontend** (React dev server on `http://localhost:3000`)
+
+```bash
+cd frontend
+npm start
+```
+
+**Backend** (Spring Boot API on `http://localhost:8080`)
+
+```bash
+cd backend
+./mvnw spring-boot:run
+```
+
+### Run with Docker Compose (optional)
+
+```bash
+docker compose up --build
+```
+
+---
+
 ## Table of Contents
 
 1. [The Big Picture](#1-the-big-picture)
