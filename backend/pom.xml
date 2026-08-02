@@ -17,7 +17,7 @@
     <description>Baseline Spring Boot backend for modern_web_app</description>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>25</java.version>
     </properties>
 
     <dependencies>
